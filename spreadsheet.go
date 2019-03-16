@@ -15,7 +15,7 @@ import (
 const (
 	KeyCredentialFilePath = "TAMATE_SPREADSHEET_CREDENTIAL_FILE_PATH"
 	KeySheetId            = "TAMATE_SPREADSHEET_SHEET_ID"
-	KeySheetName          = "TAMATE_SPREADSHEET_SHEET_Name"
+	KeySheetName          = "TAMATE_SPREADSHEET_SHEET_NAME"
 )
 
 func getClient(credentialFilePath string) (*http.Client, error) {
@@ -30,11 +30,15 @@ func getClient(credentialFilePath string) (*http.Client, error) {
 	return conf.Client(oauth2.NoContext), nil
 }
 
+type SpreadsheetService interface {
+	GetValues(ctx context.Context, spreadsheetID string, sheetName string) ([][]interface{}, error)
+}
+
 type googleSpreadsheetService struct {
 	service *sheets.SpreadsheetsService
 }
 
-func newGoogleSpreadsheetService(ctx context.Context) (*googleSpreadsheetService, error) {
+func newGoogleSpreadsheetService(ctx context.Context) (SpreadsheetService, error) {
 	path := os.Getenv(KeyCredentialFilePath)
 	if path == "" {
 		return nil, fmt.Errorf("env: %s not set", KeyCredentialFilePath)
@@ -52,7 +56,7 @@ func newGoogleSpreadsheetService(ctx context.Context) (*googleSpreadsheetService
 	}, nil
 }
 
-func (s *googleSpreadsheetService) Get(ctx context.Context, spreadsheetID string, sheetName string) ([][]interface{}, error) {
+func (s *googleSpreadsheetService) GetValues(ctx context.Context, spreadsheetID string, sheetName string) ([][]interface{}, error) {
 	valueRange, err := s.service.Values.Get(spreadsheetID, sheetName).Context(ctx).Do()
 	if err != nil {
 		return nil, err

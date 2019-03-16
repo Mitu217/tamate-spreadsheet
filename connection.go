@@ -2,7 +2,6 @@ package spreadsheet
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -12,7 +11,7 @@ import (
 type SpreadsheetConn struct {
 	SpreadsheetID  string
 	ColumnRowIndex int
-	service        *googleSpreadsheetService
+	service        SpreadsheetService
 }
 
 func newSpreadsheetConn(ctx context.Context, sheetID string, columnRowIndex int) (*SpreadsheetConn, error) {
@@ -34,51 +33,64 @@ func (c *SpreadsheetConn) Close() error {
 	return nil
 }
 
-func (c *SpreadsheetConn) GetSchema(ctx context.Context, name string) (*driver.Schema, error) {
-	values, err := c.getValues(ctx, name)
+func (c *SpreadsheetConn) GetSchema(ctx context.Context, sheetName string) (*driver.Schema, error) {
+	values, err := c.service.GetValues(ctx, c.SpreadsheetID, sheetName)
 	if err != nil {
 		return nil, err
 	}
-	primaryKey := &driver.Key{
-		KeyType: driver.KeyTypePrimary,
+	row := values[c.ColumnRowIndex]
+
+	schema := &driver.Schema{
+		Name:    sheetName,
+		Columns: make([]*driver.Column, 0),
+		PrimaryKey: &driver.Key{
+			KeyType:     driver.KeyTypePrimary,
+			ColumnNames: make([]string, 0),
+		},
 	}
-	cols := make([]*driver.Column, 0)
-	for rowIndex, row := range values {
-		if rowIndex != c.ColumnRowIndex {
-			continue
+
+	// Setting Columns
+	for i, val := range row {
+		spreadsheetColName, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("interface conversion: interface {} cannot cast string: %v", val)
 		}
-		for colIndex := range row {
-			colName, ok := row[colIndex].(string)
-			if !ok {
-				return nil, errors.New("interface conversion: interface {} is not string")
-			}
-			// check primarykey
-			reg := regexp.MustCompile("\\((.+?)\\)")
-			if res := reg.FindStringSubmatch(colName); len(res) >= 2 {
-				colName = res[1]
-				primaryKey.ColumnNames = append(primaryKey.ColumnNames, colName)
-			}
-			cols = append(cols, &driver.Column{
-				Name:            colName,
-				OrdinalPosition: colIndex,
-				Type:            driver.ColumnTypeString,
-			})
+		genericColName, err := columnNameFromSpreadSheetToGeneric(spreadsheetColName)
+		if err != nil {
+			return nil, err
 		}
-		break
+		col := &driver.Column{
+			Name:            genericColName,
+			OrdinalPosition: i,
+			Type:            driver.ColumnTypeString,
+		}
+		schema.Columns = append(schema.Columns, col)
 	}
-	return &driver.Schema{
-		Name:       name,
-		PrimaryKey: primaryKey,
-		Columns:    cols,
-	}, nil
+
+	// Setting PrimaryKey
+	for _, val := range row {
+		spreadsheetColName, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("interface conversion: interface {} cannot cast string: %v", val)
+		}
+		genericColName, err := columnNameFromSpreadSheetToGeneric(spreadsheetColName)
+		if err != nil {
+			return nil, err
+		}
+		if spreadsheetColName != genericColName {
+			schema.PrimaryKey.ColumnNames = append(schema.PrimaryKey.ColumnNames, genericColName)
+		}
+	}
+
+	return schema, nil
 }
 
-func (c *SpreadsheetConn) SetSchema(ctx context.Context, name string, schema *driver.Schema) error {
-	return fmt.Errorf("feature support")
+func (c *SpreadsheetConn) SetSchema(ctx context.Context, sheetName string, schema *driver.Schema) error {
+	return nil
 }
 
 func (c *SpreadsheetConn) GetRows(ctx context.Context, sheetName string) ([]*driver.Row, error) {
-	values, err := c.getValues(ctx, sheetName)
+	values, err := c.service.GetValues(ctx, c.SpreadsheetID, sheetName)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +137,21 @@ func (c *SpreadsheetConn) SetRows(ctx context.Context, name string, rows []*driv
 	return fmt.Errorf("feature support")
 }
 
-func (c *SpreadsheetConn) getValues(ctx context.Context, sheetName string) ([][]interface{}, error) {
-	return c.service.Get(ctx, c.SpreadsheetID, sheetName)
+func columnNameFromSpreadSheetToGeneric(columnName string) (string, error) {
+	reg := regexp.MustCompile("\\((.+?)\\)")
+	if res := reg.FindStringSubmatch(columnName); len(res) >= 2 {
+		return res[1], nil
+	}
+	return columnName, nil
+}
+
+func columnNameFromGenericToSpreadSheet(col *driver.Column, pk *driver.Key) (string, error) {
+	if pk != nil && pk.KeyType == driver.KeyTypePrimary {
+		for _, v := range pk.ColumnNames {
+			if v == col.Name {
+				return "(" + col.Name + ")", nil
+			}
+		}
+	}
+	return col.Name, nil
 }
