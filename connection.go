@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/Mitu217/tamate/driver"
 	"google.golang.org/api/sheets/v4"
+	"github.com/go-tamate/tamate/driver"
 )
 
 type SpreadsheetService interface {
