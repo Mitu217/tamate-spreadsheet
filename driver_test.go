@@ -17,15 +17,10 @@ func Test_Init(t *testing.T) {
 }
 
 func Test_Open(t *testing.T) {
-	var (
-		keySheetId = "TAMATE_SPREADSHEET_SHEET_ID"
-	)
-
-	sheetID := os.Getenv(keySheetId)
+	sheetID := os.Getenv(KeySheetId)
 	if sheetID == "" {
-		t.Skip(fmt.Printf("env: %s not set", keySheetId))
+		t.Skip(fmt.Printf("env: %s not set", KeySheetId))
 	}
-
 	dsn := fmt.Sprintf("%s", sheetID)
 	ds, err := tamate.Open(driverName, dsn)
 	defer func() {

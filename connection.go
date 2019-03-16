@@ -4,58 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"regexp"
 
-	"google.golang.org/api/sheets/v4"
 	"github.com/go-tamate/tamate/driver"
 )
-
-type SpreadsheetService interface {
-	Get(ctx context.Context, spreadsheetID string, sheetName string) ([][]interface{}, error)
-}
-
-type googleSpreadsheetService struct {
-	spreadsheetService *sheets.SpreadsheetsService
-}
-
-func (s *googleSpreadsheetService) Get(ctx context.Context, spreadsheetID string, sheetName string) ([][]interface{}, error) {
-	valueRange, err := s.spreadsheetService.Values.Get(spreadsheetID, sheetName).Context(ctx).Do()
-	if err != nil {
-		return nil, err
-	}
-	return valueRange.Values, nil
-}
-
-func newGoogleSpreadsheetService(c *http.Client) (SpreadsheetService, error) {
-	service, err := sheets.New(c)
-	if err != nil {
-		return nil, err
-	}
-	return &googleSpreadsheetService{
-		spreadsheetService: service.Spreadsheets,
-	}, nil
-}
 
 type SpreadsheetConn struct {
 	SpreadsheetID  string
 	ColumnRowIndex int
-	service        SpreadsheetService
+	service        *googleSpreadsheetService
 }
 
-func newSpreadsheetConn(client *http.Client, spreadsheetID string, columnRowIndex int) (*SpreadsheetConn, error) {
+func newSpreadsheetConn(ctx context.Context, sheetID string, columnRowIndex int) (*SpreadsheetConn, error) {
 	if columnRowIndex < 0 {
 		return nil, fmt.Errorf("columnRowIndex is invalid value: %d", columnRowIndex)
 	}
-	service, err := newGoogleSpreadsheetService(client)
+	service, err := newGoogleSpreadsheetService(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if columnRowIndex < 0 {
-		return nil, fmt.Errorf("columnRowIndex is invalid value: %d", columnRowIndex)
-	}
 	return &SpreadsheetConn{
-		SpreadsheetID:  spreadsheetID,
+		SpreadsheetID:  sheetID,
 		ColumnRowIndex: columnRowIndex,
 		service:        service,
 	}, nil
@@ -104,7 +73,10 @@ func (c *SpreadsheetConn) GetSchema(ctx context.Context, name string) (*driver.S
 	}, nil
 }
 
-// GetRows is getting rows from spreadsheet
+func (c *SpreadsheetConn) SetSchema(ctx context.Context, name string, schema *driver.Schema) error {
+	return fmt.Errorf("feature support")
+}
+
 func (c *SpreadsheetConn) GetRows(ctx context.Context, sheetName string) ([]*driver.Row, error) {
 	values, err := c.getValues(ctx, sheetName)
 	if err != nil {
@@ -147,10 +119,6 @@ func (c *SpreadsheetConn) GetRows(ctx context.Context, sheetName string) ([]*dri
 		return rows, nil
 	*/
 	return nil, nil
-}
-
-func (c *SpreadsheetConn) SetSchema(ctx context.Context, name string, schema *driver.Schema) error {
-	return fmt.Errorf("feature support")
 }
 
 func (c *SpreadsheetConn) SetRows(ctx context.Context, name string, rows []*driver.Row) error {
