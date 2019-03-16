@@ -12,7 +12,6 @@ const driverName = "spreadsheet"
 type spreadsheetlDriver struct{}
 
 func (md *spreadsheetlDriver) Open(ctx context.Context, dsn string) (driver.Conn, error) {
-	
 	return newSpreadsheetConn(nil, dsn, 0)
 }
 
