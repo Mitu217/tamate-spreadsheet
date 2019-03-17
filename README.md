@@ -67,7 +67,11 @@ https://docs.google.com/spreadsheets/d/xxxxxxxxxxxx
 
 3. Allow _ServiceAccount_ to access spreadsheet. For example add _ServiceAccount's_ email address to sharer.
 
-4. Setting credential file path or credential data to env as _TAMATE_SPREADSHEET_CREDENTIAL_FILE_PATH_ or _TAMATE_SPREADSHEET_CREDENTIAL_DATA_.
+4. Setting credential file path or credential data to env.
+```bash
+export TAMATE_SPREADSHEET_CREDENTIAL_FILE_PATH="./credential.json"
+export TAMATE_SPREADSHEET_CREDENTIAL_DATA="{...}"
+```
 
 ## Testing / Development
 
