@@ -15,7 +15,6 @@ const (
 	KeyCredentialFilePath = "TAMATE_SPREADSHEET_CREDENTIAL_FILE_PATH"
 	KeyCredentialData     = "TAMATE_SPREADSHEET_CREDENTIAL_DATA"
 	KeySheetId            = "TAMATE_SPREADSHEET_SHEET_ID"
-	KeySheetName          = "TAMATE_SPREADSHEET_SHEET_NAME"
 )
 
 func getClient(ctx context.Context, credentialData []byte) (*http.Client, error) {
@@ -27,7 +26,10 @@ func getClient(ctx context.Context, credentialData []byte) (*http.Client, error)
 }
 
 type SpreadsheetService interface {
-	GetValues(ctx context.Context, spreadsheetID string, ranges ...string) ([][]interface{}, error)
+	Ping(context.Context, string) error
+	GetValues(context.Context, string, ...string) ([]*sheets.ValueRange, error)
+	SetValues(context.Context, string, ...*sheets.ValueRange) error
+	ClearValues(context.Context, string, ...string) error
 }
 
 type googleSpreadsheetService struct {
@@ -68,10 +70,36 @@ func newGoogleSpreadsheetServiceFromData(ctx context.Context, data []byte) (Spre
 	}, nil
 }
 
-func (s *googleSpreadsheetService) GetValues(ctx context.Context, spreadsheetID string, ranges ...string) ([][]interface{}, error) {
-	valueRange, err := s.service.Values.BatchGet(spreadsheetID).Ranges(ranges...).Context(ctx).Do()
+func (s *googleSpreadsheetService) Ping(ctx context.Context, sheetID string) error {
+	// Check if the sheet can be accessed as an alternative to ping
+	_, err := s.service.Values.BatchGet(sheetID).Context(ctx).Do()
+	return err
+}
+
+func (s *googleSpreadsheetService) GetValues(ctx context.Context, sheetID string, ranges ...string) ([]*sheets.ValueRange, error) {
+	resp, err := s.service.Values.BatchGet(sheetID).Ranges(ranges...).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("%#v\n", valueRange)
+	return resp.ValueRanges, nil
+}
+
+func (s *googleSpreadsheetService) SetValues(ctx context.Context, sheetID string, valuesRanges ...*sheets.ValueRange) error {
+	// https://developers.google.com/sheets/api/reference/rest/v4/ValueInputOption
+	valueInputOption := "USER_ENTERED"
+
+	req := &sheets.BatchUpdateValuesRequest{
+		ValueInputOption: valueInputOption,
+		Data:             valuesRanges,
+	}
+	_, err := s.service.Values.BatchUpdate(sheetID, req).Context(ctx).Do()
+	return err
+}
+
+func (s *googleSpreadsheetService) ClearValues(ctx context.Context, sheetID string, ranges ...string) error {
+	req := &sheets.BatchClearValuesRequest{
+		Ranges: ranges,
+	}
+	_, err := s.service.Values.BatchClear(sheetID, req).Context(ctx).Do()
+	return err
 }
