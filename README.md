@@ -46,7 +46,7 @@ Use `spreadsheet` as `driverName` and a valid [DSN](#dsn-data-source-name)  as `
 import  "github.com/go-tamate/tamate"
 import  _ "github.com/go-tamate/tamate-spreadsheet"
 
-ds, err := tamate.Open("spreadseet", "xxxxxxxxxxxx")
+ds, err := tamate.Open("spreadsheet", "xxxxxxxxxxxx")
 ```
 
 Use this to `Get`, `Set`, `GettingDiff`, etc.
