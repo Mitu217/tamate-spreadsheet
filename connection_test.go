@@ -7,14 +7,30 @@ import (
 	"github.com/go-tamate/tamate"
 	"github.com/go-tamate/tamate/driver"
 	"github.com/stretchr/testify/assert"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 type TestSpreadsheetService struct {
-	values [][]interface{}
+	valueRanges []*sheets.ValueRange
 }
 
-func (s *TestSpreadsheetService) GetValues(ctx context.Context, spreadsheetID string, ranges ...string) ([][]interface{}, error) {
-	return s.values, nil
+func (s *TestSpreadsheetService) Ping(ctx context.Context, sheetID string) error {
+	return nil
+}
+
+func (s *TestSpreadsheetService) GetValues(ctx context.Context, sheetID string, ranges ...string) ([]*sheets.ValueRange, error) {
+	return s.valueRanges, nil
+}
+
+func (s *TestSpreadsheetService) SetValues(ctx context.Context, sheetID string, valueRanges ...*sheets.ValueRange) error {
+	s.valueRanges = valueRanges
+	return nil
+}
+
+func (s *TestSpreadsheetService) ClearValues(ctx context.Context, sheetID string, ranges ...string) error {
+	// FIXME
+	s.valueRanges = []*sheets.ValueRange{}
+	return nil
 }
 
 type fakeSpreadsheetDriver struct {
@@ -26,26 +42,30 @@ func (fd *fakeSpreadsheetDriver) Open(ctx context.Context, dsn string) (driver.C
 	return fd.FakeOpen(ctx, dsn)
 }
 
-func TestSpreadsheet_GetSchema(t *testing.T) {
+func Test_GetSchema(t *testing.T) {
 	var (
 		ctx            = context.Background()
 		dsn            = ""
 		sheetName      = ""
-		columnRowIndex = 0
+		schemaRowIndex = 0
 		fakeDriverName = "GetSchema"
 	)
 
 	// Prepare
 	fakeService := &TestSpreadsheetService{
-		values: [][]interface{}{
-			[]interface{}{"id", "name", "age"},
+		valueRanges: []*sheets.ValueRange{
+			&sheets.ValueRange{
+				Values: [][]interface{}{
+					[]interface{}{"id", "name", "age"},
+				},
+			},
 		},
 	}
 	fakeDriver := &fakeSpreadsheetDriver{
 		FakeOpen: func(ctx context.Context, dsn string) (driver.Conn, error) {
 			return &SpreadsheetConn{
-				SpreadsheetID:  sheetName,
-				ColumnRowIndex: columnRowIndex,
+				sheetID:        dsn,
+				schemaRowIndex: schemaRowIndex,
 				service:        fakeService,
 			}, nil
 		},
@@ -60,30 +80,30 @@ func TestSpreadsheet_GetSchema(t *testing.T) {
 	// Getting schema
 	sc, err := ds.GetSchema(ctx, sheetName)
 	if assert.NoError(t, err) {
-		assert.Equal(t, fakeService.values[columnRowIndex][0], sc.Columns[0].Name)
+		assert.Equal(t, fakeService.valueRanges[0].Values[schemaRowIndex][0], sc.Columns[0].Name)
 		assert.Equal(t, driver.ColumnTypeString, sc.Columns[0].Type)
-		assert.Equal(t, fakeService.values[columnRowIndex][1], sc.Columns[1].Name)
+		assert.Equal(t, fakeService.valueRanges[0].Values[schemaRowIndex][1], sc.Columns[1].Name)
 		assert.Equal(t, driver.ColumnTypeString, sc.Columns[1].Type)
-		assert.Equal(t, fakeService.values[columnRowIndex][2], sc.Columns[2].Name)
+		assert.Equal(t, fakeService.valueRanges[0].Values[schemaRowIndex][2], sc.Columns[2].Name)
 		assert.Equal(t, driver.ColumnTypeString, sc.Columns[2].Type)
 	}
 }
 
-func TestSpreadsheet_SetSchema(t *testing.T) {
+func Test_SetSchema(t *testing.T) {
 	var (
 		ctx            = context.Background()
 		dsn            = ""
 		sheetName      = ""
-		columnRowIndex = 0
+		schemaRowIndex = 0
 		fakeDriverName = "SetSchema"
 	)
 
 	// Prepare
-	fakeSchema := &driver.Schema{
+	schema := &driver.Schema{
 		Name: sheetName,
 		PrimaryKey: &driver.Key{
 			KeyType:     driver.KeyTypePrimary,
-			ColumnNames: []string{"id"},
+			ColumnNames: []string{},
 		},
 		Columns: []*driver.Column{
 			driver.NewColumn("id", 0, driver.ColumnTypeInt, true, false),
@@ -91,13 +111,17 @@ func TestSpreadsheet_SetSchema(t *testing.T) {
 		},
 	}
 	fakeService := &TestSpreadsheetService{
-		values: [][]interface{}{},
+		valueRanges: []*sheets.ValueRange{
+			&sheets.ValueRange{
+				Values: [][]interface{}{},
+			},
+		},
 	}
 	fakeDriver := &fakeSpreadsheetDriver{
 		FakeOpen: func(ctx context.Context, dsn string) (driver.Conn, error) {
 			return &SpreadsheetConn{
-				SpreadsheetID:  sheetName,
-				ColumnRowIndex: columnRowIndex,
+				sheetID:        dsn,
+				schemaRowIndex: schemaRowIndex,
 				service:        fakeService,
 			}, nil
 		},
@@ -110,7 +134,13 @@ func TestSpreadsheet_SetSchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Setting schema
-	if assert.NoError(t, ds.SetSchema(ctx, sheetName, fakeSchema)) {
-
+	if assert.NoError(t, ds.SetSchema(ctx, sheetName, schema)) {
+		sc, err := ds.GetSchema(ctx, sheetName)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "id", sc.Columns[0].Name)
+			assert.Equal(t, driver.ColumnTypeString, sc.Columns[0].Type)
+			assert.Equal(t, "name", sc.Columns[1].Name)
+			assert.Equal(t, driver.ColumnTypeString, sc.Columns[1].Type)
+		}
 	}
 }
