@@ -17,11 +17,18 @@ func Test_Init(t *testing.T) {
 }
 
 func Test_Open(t *testing.T) {
-	sheetID := os.Getenv(KeySheetId)
-	if sheetID == "" {
-		t.Skip(fmt.Printf("env: %s not set", KeySheetId))
+	var (
+		dsn = ""
+	)
+
+	// Prepare
+	strCredentialData := os.Getenv(KeyCredentialData)
+	credentialFilePath := os.Getenv(KeyCredentialFilePath)
+	if strCredentialData == "" && credentialFilePath == "" {
+		t.Skip(fmt.Printf("env: %s, %s not set", KeyCredentialData, KeyCredentialFilePath))
 	}
-	dsn := fmt.Sprintf("%s", sheetID)
+
+	// Open
 	ds, err := tamate.Open(driverName, dsn)
 	defer func() {
 		err := ds.Close()

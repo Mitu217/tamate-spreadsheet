@@ -18,6 +18,7 @@ func newSpreadsheetConn(ctx context.Context, sheetID string, columnRowIndex int)
 	if columnRowIndex < 0 {
 		return nil, fmt.Errorf("columnRowIndex is invalid value: %d", columnRowIndex)
 	}
+
 	service, err := newGoogleSpreadsheetService(ctx)
 	if err != nil {
 		return nil, err

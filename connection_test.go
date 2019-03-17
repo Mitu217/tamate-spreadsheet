@@ -13,13 +13,8 @@ type TestSpreadsheetService struct {
 	values [][]interface{}
 }
 
-func (s *TestSpreadsheetService) GetValues(ctx context.Context, sheetId string, sheetName string) ([][]interface{}, error) {
+func (s *TestSpreadsheetService) GetValues(ctx context.Context, spreadsheetID string, ranges ...string) ([][]interface{}, error) {
 	return s.values, nil
-}
-
-func (s *TestSpreadsheetService) SetValues(ctx context.Context, sheetId string, sheetName string, values [][]interface{}) error {
-	s.values = values
-	return nil
 }
 
 type fakeSpreadsheetDriver struct {
@@ -71,5 +66,51 @@ func TestSpreadsheet_GetSchema(t *testing.T) {
 		assert.Equal(t, driver.ColumnTypeString, sc.Columns[1].Type)
 		assert.Equal(t, fakeService.values[columnRowIndex][2], sc.Columns[2].Name)
 		assert.Equal(t, driver.ColumnTypeString, sc.Columns[2].Type)
+	}
+}
+
+func TestSpreadsheet_SetSchema(t *testing.T) {
+	var (
+		ctx            = context.Background()
+		dsn            = ""
+		sheetName      = ""
+		columnRowIndex = 0
+		fakeDriverName = "SetSchema"
+	)
+
+	// Prepare
+	fakeSchema := &driver.Schema{
+		Name: sheetName,
+		PrimaryKey: &driver.Key{
+			KeyType:     driver.KeyTypePrimary,
+			ColumnNames: []string{"id"},
+		},
+		Columns: []*driver.Column{
+			driver.NewColumn("id", 0, driver.ColumnTypeInt, true, false),
+			driver.NewColumn("name", 1, driver.ColumnTypeString, true, false),
+		},
+	}
+	fakeService := &TestSpreadsheetService{
+		values: [][]interface{}{},
+	}
+	fakeDriver := &fakeSpreadsheetDriver{
+		FakeOpen: func(ctx context.Context, dsn string) (driver.Conn, error) {
+			return &SpreadsheetConn{
+				SpreadsheetID:  sheetName,
+				ColumnRowIndex: columnRowIndex,
+				service:        fakeService,
+			}, nil
+		},
+	}
+	tamate.Register(fakeDriverName, fakeDriver)
+
+	// Open datasource
+	ds, err := tamate.Open(fakeDriverName, dsn)
+	defer ds.Close()
+	assert.NoError(t, err)
+
+	// Setting schema
+	if assert.NoError(t, ds.SetSchema(ctx, sheetName, fakeSchema)) {
+
 	}
 }
