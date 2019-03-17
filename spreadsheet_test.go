@@ -110,3 +110,24 @@ func Test_SetValues(t *testing.T) {
 		}
 	}
 }
+
+func Test_ClearValues(t *testing.T) {
+	var (
+		ctx       = context.Background()
+		sheetName = "SetValues"
+	)
+
+	// Prepare
+	strCredentialData := os.Getenv(KeyCredentialData)
+	credentialFilePath := os.Getenv(KeyCredentialFilePath)
+	if strCredentialData == "" && credentialFilePath == "" {
+		t.Skip(fmt.Printf("env: %s, %s not set", KeyCredentialData, KeyCredentialFilePath))
+	}
+	sheetID := os.Getenv(KeySheetId)
+	if sheetID == "" {
+		t.Skip(fmt.Printf("env: %s not set", KeySheetId))
+	}
+	service, err := newGoogleSpreadsheetService(ctx)
+	assert.NoError(t, err)
+	assert.NoError(t, service.ClearValues(ctx, sheetID, sheetName+"!R1C1:R1C3"))
+}
